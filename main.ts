@@ -26,7 +26,7 @@ export default class MocToManuscriptPlugin extends Plugin {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `manuscript_${timestamp}.md`;
 
-        await this.app.vault.create(filename, manuscriptContent);
+        await this.app.vault.create(filename, manuscriptContent.trim());
         new Notice("Manuscript created successfully.");
     }
 
@@ -37,23 +37,24 @@ export default class MocToManuscriptPlugin extends Plugin {
         
         let match;
         while ((match = linkRegex.exec(content)) !== null) {
-            // Add the text before the link
-            manuscriptContent += content.substring(lastIdx, match.index);
+            // Add the text before the link, ensuring it ends with exactly one newline
+            manuscriptContent += this.ensureSingleNewline(content.substring(lastIdx, match.index));
 
             // Resolve the link to content and add it
             const file = this.app.metadataCache.getFirstLinkpathDest(match[1], "");
             if (file instanceof TFile) {
                 let linkedContent = await this.app.vault.read(file);
-                // Remove YAML frontmatter
                 linkedContent = this.removeFrontMatter(linkedContent);
-                manuscriptContent += linkedContent;
+                linkedContent = this.removeLinkOnlyLines(linkedContent);
+                // Append linked content, ensuring it ends with exactly one newline
+                manuscriptContent += this.ensureSingleNewline(linkedContent);
             }
 
             lastIdx = match.index + match[0].length;
         }
         
-        // Add any remaining content after the last link
-        manuscriptContent += content.substring(lastIdx);
+        // Add any remaining content after the last link, ensuring it ends with exactly one newline
+        manuscriptContent += this.ensureSingleNewline(content.substring(lastIdx));
 
         return manuscriptContent;
     }
@@ -61,5 +62,15 @@ export default class MocToManuscriptPlugin extends Plugin {
     removeFrontMatter(content: string): string {
         const frontMatterRegex = /^---[\s\S]+?---\n/;
         return content.replace(frontMatterRegex, '');
+    }
+
+    removeLinkOnlyLines(content: string): string {
+        // Remove lines that contain only a wiki-style link
+        return content.replace(/^\[\[([^\]]+)\]\]\n/gm, '');
+    }
+
+    ensureSingleNewline(content: string): string {
+        // Trim whitespace and ensure the content ends with exactly one newline
+        return content.trim() + "\n";
     }
 }
