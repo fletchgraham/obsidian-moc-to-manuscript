@@ -16,7 +16,6 @@ export default class MocToManuscriptPlugin extends Plugin {
         }
 
         const content = await this.app.vault.read(activeFile);
-        // Process the content to include text between links
         const manuscriptContent = await this.processContentIncludingText(content);
 
         if (manuscriptContent.trim().length === 0) {
@@ -44,7 +43,9 @@ export default class MocToManuscriptPlugin extends Plugin {
             // Resolve the link to content and add it
             const file = this.app.metadataCache.getFirstLinkpathDest(match[1], "");
             if (file instanceof TFile) {
-                const linkedContent = await this.app.vault.read(file);
+                let linkedContent = await this.app.vault.read(file);
+                // Remove YAML frontmatter
+                linkedContent = this.removeFrontMatter(linkedContent);
                 manuscriptContent += linkedContent;
             }
 
@@ -55,5 +56,10 @@ export default class MocToManuscriptPlugin extends Plugin {
         manuscriptContent += content.substring(lastIdx);
 
         return manuscriptContent;
+    }
+
+    removeFrontMatter(content: string): string {
+        const frontMatterRegex = /^---[\s\S]+?---\n/;
+        return content.replace(frontMatterRegex, '');
     }
 }
