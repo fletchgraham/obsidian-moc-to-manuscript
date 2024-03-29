@@ -75,8 +75,11 @@ export default class MocToManuscriptPlugin extends Plugin {
         return content.replace(frontMatterRegex, '');
     }
 
-    removeLinkOnlyLines(content: string): string {
-        // Remove lines that contain only a wiki-style link
-        return content.replace(/^\[\[([^\]]+)\]\]$/gm, '');
-    }
+	removeLinkOnlyLines(content: string): string {
+		// This regex is designed to match lines that may contain spaces,
+		// and one or more wiki-style links, potentially separated by spaces.
+		// It ensures that the entire line, if consisting only of links (and spaces), is removed.
+		return content.split('\n').filter(line => !line.match(/^(\s*\[\[([^\]]+)\]\]\s*)+$/)).join('\n');
+	}
+	
 }
