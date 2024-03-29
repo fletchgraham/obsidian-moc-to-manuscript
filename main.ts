@@ -16,15 +16,14 @@ export default class MocToManuscriptPlugin extends Plugin {
         }
 
         const content = await this.app.vault.read(activeFile);
-        const links = this.extractWikiStyleLinks(content);
-        const fileContents = await this.readLinkedFilesContents(links);
+        // Process the content to include text between links
+        const manuscriptContent = await this.processContentIncludingText(content);
 
-        if(fileContents.length === 0) {
-            new Notice("No linked contents could be extracted.");
+        if (manuscriptContent.trim().length === 0) {
+            new Notice("No content could be extracted.");
             return;
         }
 
-        const manuscriptContent = fileContents.join("\n\n");
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `linked_manuscript_${timestamp}.md`;
 
@@ -32,25 +31,29 @@ export default class MocToManuscriptPlugin extends Plugin {
         new Notice("Linked manuscript created successfully.");
     }
 
-    extractWikiStyleLinks(content: string): string[] {
-        const links = [];
+    async processContentIncludingText(content: string): Promise<string> {
         const linkRegex = /\[\[([^\]]+)\]\]/g;
+        let lastIdx = 0;
+        let manuscriptContent = '';
+        
         let match;
         while ((match = linkRegex.exec(content)) !== null) {
-            links.push(match[1].trim());
-        }
-        return links;
-    }
+            // Add the text before the link
+            manuscriptContent += content.substring(lastIdx, match.index);
 
-    async readLinkedFilesContents(links: string[]): Promise<string[]> {
-        const fileContents: string[] = [];
-        for (const link of links) {
-            const file = this.app.metadataCache.getFirstLinkpathDest(link, "");
+            // Resolve the link to content and add it
+            const file = this.app.metadataCache.getFirstLinkpathDest(match[1], "");
             if (file instanceof TFile) {
-                const content = await this.app.vault.read(file);
-                fileContents.push(content);
+                const linkedContent = await this.app.vault.read(file);
+                manuscriptContent += linkedContent;
             }
+
+            lastIdx = match.index + match[0].length;
         }
-        return fileContents;
+        
+        // Add any remaining content after the last link
+        manuscriptContent += content.substring(lastIdx);
+
+        return manuscriptContent;
     }
 }
