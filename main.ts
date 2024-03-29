@@ -1,29 +1,56 @@
-import { Notice, Plugin } from "obsidian";
+import { Notice, Plugin, TFile } from "obsidian";
 
 export default class MocToManuscriptPlugin extends Plugin {
-  async onload() {
-    this.addRibbonIcon("edit", "Generate manuscript", async () => {
-      await this.generateManuscript();
-      new Notice("Manuscript generated successfully.");
-    });
-  }
+    async onload() {
+        this.addRibbonIcon("edit", "Generate manuscript", async () => {
+            await this.generateManuscriptFromLinks();
+            new Notice("Manuscript generated successfully.");
+        });
+    }
 
-  async generateManuscript(): Promise<void> {
-    const { vault } = this.app;
+    async generateManuscriptFromLinks(): Promise<void> {
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) {
+            new Notice("No file is currently open.");
+            return;
+        }
 
-    // Get all markdown files and read their contents asynchronously
-    const fileContents: string[] = await Promise.all(
-      vault.getMarkdownFiles().map((file) => vault.cachedRead(file))
-    );
+        const content = await this.app.vault.read(activeFile);
+        const links = this.extractWikiStyleLinks(content);
+        const fileContents = await this.readLinkedFilesContents(links);
 
-    // Join the contents of all files into a single string
-    const manuscriptContent = fileContents.join("\n\n");
+        if(fileContents.length === 0) {
+            new Notice("No linked contents could be extracted.");
+            return;
+        }
 
-    // Create a manuscript file with the combined contents of all markdown files
-    // Make sure to await the promise!
-    await this.app.vault.create('manuscript.md', manuscriptContent);
+        const manuscriptContent = fileContents.join("\n\n");
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `linked_manuscript_${timestamp}.md`;
 
-    // Log or notify the user upon successful creation
-    console.log("Manuscript created successfully.");
-  }
+        await this.app.vault.create(filename, manuscriptContent);
+        new Notice("Linked manuscript created successfully.");
+    }
+
+    extractWikiStyleLinks(content: string): string[] {
+        const links = [];
+        const linkRegex = /\[\[([^\]]+)\]\]/g;
+        let match;
+        while ((match = linkRegex.exec(content)) !== null) {
+            links.push(match[1].trim());
+        }
+        return links;
+    }
+
+    async readLinkedFilesContents(links: string[]): Promise<string[]> {
+        const fileContents: string[] = [];
+        for (const link of links) {
+            const file = this.app.metadataCache.getFirstLinkpathDest(link, "");
+            if (file instanceof TFile) {
+                const content = await this.app.vault.read(file);
+                fileContents.push(content);
+            }
+        }
+        return fileContents;
+    }
 }
