@@ -25,10 +25,10 @@ export default class MocToManuscriptPlugin extends Plugin {
         }
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `linked_manuscript_${timestamp}.md`;
+        const filename = `manuscript_${timestamp}.md`;
 
         await this.app.vault.create(filename, manuscriptContent);
-        new Notice("Linked manuscript created successfully.");
+        new Notice("Manuscript created successfully.");
     }
 
     async processContentIncludingText(content: string): Promise<string> {
